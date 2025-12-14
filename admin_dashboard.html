@@ -1,0 +1,1220 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>法律AI助手 - 后台管理系统</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        .sidebar {
+            min-height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .sidebar .nav-link {
+            color: rgba(255,255,255,0.8);
+            border-radius: 0.5rem;
+            margin: 0.2rem 0;
+        }
+        .sidebar .nav-link:hover {
+            color: white;
+            background: rgba(255,255,255,0.1);
+        }
+        .sidebar .nav-link.active {
+            color: white;
+            background: rgba(255,255,255,0.2);
+        }
+        .main-content {
+            background-color: #f8f9fa;
+            min-height: 100vh;
+        }
+        .card {
+            border: none;
+            border-radius: 1rem;
+            box-shadow: 0 0.125rem 0.25rem rgba(0,0,0,0.075);
+        }
+        .card-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 1rem 1rem 0 0 !important;
+        }
+        .stat-card {
+            transition: transform 0.2s;
+        }
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+        .login-container {
+            min-height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .login-card {
+            border: none;
+            border-radius: 1rem;
+            box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.15);
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <!-- 登录页面 -->
+        <div id="loginPage" class="login-container" style="display: none;">
+            <div class="container">
+                <div class="row justify-content-center">
+                    <div class="col-md-6 col-lg-4">
+                        <div class="card login-card">
+                            <div class="card-body p-5">
+                                <div class="text-center mb-4">
+                                    <h3>🏛️ 法律AI助手</h3>
+                                    <p class="text-muted">后台管理系统</p>
+                                </div>
+                                <form id="loginForm">
+                                    <div class="mb-3">
+                                        <label for="adminToken" class="form-label">管理员Token</label>
+                                        <input type="password" class="form-control" id="adminToken" required>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary w-100">
+                                        <i class="bi bi-shield-lock"></i> 登录
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 主界面 -->
+        <div id="mainContent" class="container-fluid">
+            <div class="row">
+                <!-- 侧边栏 -->
+                <nav class="col-md-3 col-lg-2 d-md-block sidebar collapse">
+                    <div class="position-sticky pt-3">
+                        <div class="text-center text-white mb-4">
+                            <h5>🏛️ 管理后台</h5>
+                        </div>
+                        <ul class="nav flex-column">
+                            <li class="nav-item">
+                                <a class="nav-link active" href="#" data-page="dashboard">
+                                    <i class="bi bi-speedometer2"></i> 仪表板
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="#" data-page="users">
+                                    <i class="bi bi-people"></i> 用户管理
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="#" data-page="analytics">
+                                    <i class="bi bi-graph-up"></i> 数据分析
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="#" data-page="logs">
+                                    <i class="bi bi-file-text"></i> 操作日志
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="#" data-page="config">
+                                    <i class="bi bi-gear"></i> 系统配置
+                                </a>
+                            </li>
+                            <li class="nav-item mt-4">
+                                <a class="nav-link text-danger" href="#" id="logoutBtn">
+                                    <i class="bi bi-box-arrow-right"></i> 退出登录
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+                </nav>
+
+                <!-- 主内容区 -->
+                <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-content">
+                    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                        <h1 class="h2" id="pageTitle">仪表板</h1>
+                        <div class="btn-toolbar mb-2 mb-md-0">
+                            <button class="btn btn-sm btn-outline-secondary" id="refreshBtn">
+                                <i class="bi bi-arrow-clockwise"></i> 刷新
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 仪表板内容 -->
+                    <div id="dashboardContent" class="page-content">
+                        <div class="row mb-4">
+                            <div class="col-xl-3 col-md-6 mb-4">
+                                <div class="card stat-card border-left-primary shadow h-100 py-2">
+                                    <div class="card-body">
+                                        <div class="row no-gutters align-items-center">
+                                            <div class="col mr-2">
+                                                <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">总用户数</div>
+                                                <div class="h5 mb-0 font-weight-bold text-gray-800" id="totalUsers">-</div>
+                                            </div>
+                                            <div class="col-auto">
+                                                <i class="bi bi-people fa-2x text-gray-300"></i>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-xl-3 col-md-6 mb-4">
+                                <div class="card stat-card border-left-success shadow h-100 py-2">
+                                    <div class="card-body">
+                                        <div class="row no-gutters align-items-center">
+                                            <div class="col mr-2">
+                                                <div class="text-xs font-weight-bold text-success text-uppercase mb-1">总查询数</div>
+                                                <div class="h5 mb-0 font-weight-bold text-gray-800" id="totalQueries">-</div>
+                                            </div>
+                                            <div class="col-auto">
+                                                <i class="bi bi-chat-dots fa-2x text-gray-300"></i>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-xl-3 col-md-6 mb-4">
+                                <div class="card stat-card border-left-info shadow h-100 py-2">
+                                    <div class="card-body">
+                                        <div class="row no-gutters align-items-center">
+                                            <div class="col mr-2">
+                                                <div class="text-xs font-weight-bold text-info text-uppercase mb-1">今日查询</div>
+                                                <div class="h5 mb-0 font-weight-bold text-gray-800" id="dailyQueries">-</div>
+                                            </div>
+                                            <div class="col-auto">
+                                                <i class="bi bi-calendar-day fa-2x text-gray-300"></i>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-xl-3 col-md-6 mb-4">
+                                <div class="card stat-card border-left-warning shadow h-100 py-2">
+                                    <div class="card-body">
+                                        <div class="row no-gutters align-items-center">
+                                            <div class="col mr-2">
+                                                <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">平均响应时间</div>
+                                                <div class="h5 mb-0 font-weight-bold text-gray-800" id="avgResponseTime">-</div>
+                                            </div>
+                                            <div class="col-auto">
+                                                <i class="bi bi-speedometer2 fa-2x text-gray-300"></i>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 热门问题 -->
+                        <div class="card shadow mb-4">
+                            <div class="card-header py-3">
+                                <h6 class="m-0 font-weight-bold">热门问题 Top 10</h6>
+                            </div>
+                            <div class="card-body">
+                                <div id="popularQuestions" class="table-responsive">
+                                    <div class="text-center">
+                                        <div class="spinner-border" role="status">
+                                            <span class="visually-hidden">加载中...</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 用户管理内容 -->
+                    <div id="usersContent" class="page-content" style="display: none;">
+                        <!-- 用户搜索 -->
+                        <div class="card shadow mb-4">
+                            <div class="card-header py-3">
+                                <h6 class="m-0 font-weight-bold">用户管理</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="row mb-3">
+                                    <div class="col-md-4">
+                                        <input type="text" class="form-control" id="userSearch" placeholder="搜索用户ID...">
+                                    </div>
+                                    <div class="col-md-2">
+                                        <button class="btn btn-primary d-block" onclick="searchUsers()">
+                                            <i class="bi bi-search"></i> 搜索
+                                        </button>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <select class="form-select" id="userPage">
+                                            <option value="1">第1页</option>
+                                            <option value="2">第2页</option>
+                                            <option value="3">第3页</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <button class="btn btn-outline-secondary d-block" onclick="loadUsers()">
+                                            <i class="bi bi-arrow-clockwise"></i> 刷新
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- 用户统计 -->
+                                <div class="row mb-4">
+                                    <div class="col-md-3">
+                                        <div class="card bg-primary text-white">
+                                            <div class="card-body">
+                                                <h5 class="card-title">总用户数</h5>
+                                                <h3 id="totalUsersCount">-</h3>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="card bg-success text-white">
+                                            <div class="card-body">
+                                                <h5 class="card-title">活跃用户</h5>
+                                                <h3 id="activeUsersCount">-</h3>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="card bg-info text-white">
+                                            <div class="card-body">
+                                                <h5 class="card-title">今日请求</h5>
+                                                <h3 id="todayQueriesCount">-</h3>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="card bg-warning text-white">
+                                            <div class="card-body">
+                                                <h5 class="card-title">平均响应</h5>
+                                                <h3 id="avgResponseCount">-</h3>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 用户列表 -->
+                                <div id="usersList" class="table-responsive">
+                                    <div class="text-center">
+                                        <div class="spinner-border" role="status">
+                                            <span class="visually-hidden">加载中...</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 分页 -->
+                                <nav id="userPagination" class="mt-3">
+                                    <ul class="pagination justify-content-center">
+                                        <li class="page-item">
+                                            <a class="page-link" href="#" onclick="changeUserPage(-1)">上一页</a>
+                                        </li>
+                                        <li class="page-item active">
+                                            <span class="page-link">1</span>
+                                        </li>
+                                        <li class="page-item">
+                                            <a class="page-link" href="#" onclick="changeUserPage(1)">下一页</a>
+                                        </li>
+                                    </ul>
+                                </nav>
+                            </div>
+                        </div>
+
+                        <!-- 用户详情模态框 -->
+                        <div class="modal fade" id="userDetailModal" tabindex="-1">
+                            <div class="modal-dialog modal-lg">
+                                <div class="modal-content">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title">用户详情</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <div id="userDetailContent">
+                                            <div class="text-center">
+                                                <div class="spinner-border" role="status"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 数据分析内容 -->
+                    <div id="analyticsContent" class="page-content" style="display: none;">
+                        <!-- 时间范围选择 -->
+                        <div class="card shadow mb-4">
+                            <div class="card-header py-3">
+                                <h6 class="m-0 font-weight-bold">数据分析</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="row mb-3">
+                                    <div class="col-md-3">
+                                        <label for="analyticsDays" class="form-label">统计天数</label>
+                                        <select class="form-select" id="analyticsDays">
+                                            <option value="7">最近7天</option>
+                                            <option value="30">最近30天</option>
+                                            <option value="90">最近90天</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">&nbsp;</label>
+                                        <button class="btn btn-primary d-block" onclick="loadAnalytics()">
+                                            <i class="bi bi-bar-chart"></i> 刷新数据
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- 活动趋势图表 -->
+                                <div class="card shadow mb-4">
+                                    <div class="card-header py-3">
+                                        <h6 class="m-0 font-weight-bold">用户活动趋势</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <canvas id="activityChart" height="100"></canvas>
+                                    </div>
+                                </div>
+
+                                <!-- 详细统计表格 -->
+                                <div class="card shadow mb-4">
+                                    <div class="card-header py-3">
+                                        <h6 class="m-0 font-weight-bold">详细统计数据</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <div id="activityTable" class="table-responsive">
+                                            <div class="text-center">
+                                                <div class="spinner-border" role="status">
+                                                    <span class="visually-hidden">加载中...</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="logsContent" class="page-content" style="display: none;">
+                        <!-- 日志过滤选项 -->
+                        <div class="card shadow mb-4">
+                            <div class="card-header py-3">
+                                <h6 class="m-0 font-weight-bold">操作日志</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="row mb-3">
+                                    <div class="col-md-3">
+                                        <label for="logLevel" class="form-label">日志级别</label>
+                                        <select class="form-select" id="logLevel">
+                                            <option value="">全部</option>
+                                            <option value="info">信息</option>
+                                            <option value="warning">警告</option>
+                                            <option value="error">错误</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label for="logPage" class="form-label">页码</label>
+                                        <input type="number" class="form-control" id="logPage" value="1" min="1">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">&nbsp;</label>
+                                        <button class="btn btn-primary d-block" onclick="loadLogs()">
+                                            <i class="bi bi-search"></i> 查询
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- 日志列表 -->
+                                <div class="card shadow mb-4">
+                                    <div class="card-header py-3">
+                                        <h6 class="m-0 font-weight-bold">日志记录</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <div id="logsList" class="table-responsive">
+                                            <div class="text-center">
+                                                <div class="spinner-border" role="status">
+                                                    <span class="visually-hidden">加载中...</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <!-- 分页 -->
+                                        <nav id="logPagination" class="mt-3" style="display: none;">
+                                            <ul class="pagination justify-content-center">
+                                                <li class="page-item" id="prevPage">
+                                                    <a class="page-link" href="#" onclick="changeLogPage(-1)">上一页</a>
+                                                </li>
+                                                <li class="page-item active">
+                                                    <span class="page-link" id="currentPage">1</span>
+                                                </li>
+                                                <li class="page-item" id="nextPage">
+                                                    <a class="page-link" href="#" onclick="changeLogPage(1)">下一页</a>
+                                                </li>
+                                            </ul>
+                                        </nav>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="configContent" class="page-content" style="display: none;">
+                        <div class="card shadow mb-4">
+                            <div class="card-header py-3">
+                                <h6 class="m-0 font-weight-bold">系统配置</h6>
+                            </div>
+                            <div class="card-body">
+                                <!-- 配置表单 -->
+                                <form id="configForm">
+                                    <div class="row">
+                                        <!-- 安全配置 -->
+                                        <div class="col-md-6">
+                                            <h6 class="mb-3"><i class="bi bi-shield-lock"></i> 安全配置</h6>
+                                            <div class="mb-3">
+                                                <label for="adminToken" class="form-label">管理员Token</label>
+                                                <div class="input-group">
+                                                    <input type="password" class="form-control" id="adminTokenConfig" placeholder="输入新的管理员Token">
+                                                    <button class="btn btn-outline-secondary" type="button" onclick="togglePassword('adminTokenConfig')">
+                                                        <i class="bi bi-eye"></i>
+                                                    </button>
+                                                </div>
+                                                <div class="form-text">修改后需要使用新Token重新登录</div>
+                                            </div>
+                                            <div class="mb-3">
+                                                <div class="form-check form-switch">
+                                                    <input class="form-check-input" type="checkbox" id="enableAnalytics">
+                                                    <label class="form-check-label" for="enableAnalytics">
+                                                        启用用户行为数据分析
+                                                    </label>
+                                                </div>
+                                                <div class="form-text">关闭后将不再收集用户请求数据</div>
+                                            </div>
+                                        </div>
+
+                                        <!-- 系统配置 -->
+                                        <div class="col-md-6">
+                                            <h6 class="mb-3"><i class="bi bi-gear"></i> 系统参数</h6>
+                                            <div class="mb-3">
+                                                <label for="maxResponseLength" class="form-label">最大响应长度</label>
+                                                <input type="number" class="form-control" id="maxResponseLength" min="100" max="10000">
+                                                <div class="form-text">系统给用户的响应最大字符数</div>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label for="responseTimeout" class="form-label">响应超时时间（秒）</label>
+                                                <input type="number" class="form-control" id="responseTimeout" min="5" max="300">
+                                                <div class="form-text">AI响应的最大等待时间</div>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label for="apiTimeout" class="form-label">API超时时间（秒）</label>
+                                                <input type="number" class="form-control" id="apiTimeout" min="1" max="60">
+                                                <div class="form-text">API请求的超时时间</div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="row mt-4">
+                                        <div class="col-12">
+                                            <h6 class="mb-3"><i class="bi bi-link-45deg"></i> 集成配置</h6>
+                                            <div class="mb-3">
+                                                <label for="callbackUrl" class="form-label">回调URL</label>
+                                                <input type="url" class="form-control" id="callbackUrl">
+                                                <div class="form-text">微信公众号回调地址</div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="row mt-4">
+                                        <div class="col-12">
+                                            <button type="submit" class="btn btn-primary">
+                                                <i class="bi bi-check-circle"></i> 保存配置
+                                            </button>
+                                            <button type="button" class="btn btn-outline-secondary ms-2" onclick="loadConfig()">
+                                                <i class="bi bi-arrow-clockwise"></i> 重新加载
+                                            </button>
+                                        </div>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+
+                        <!-- 配置状态 -->
+                        <div class="card shadow mb-4">
+                            <div class="card-header py-3">
+                                <h6 class="m-0 font-weight-bold">系统状态</h6>
+                            </div>
+                            <div class="card-body">
+                                <div id="systemStatus">
+                                    <div class="row">
+                                        <div class="col-md-12">
+                                            <h6>数据库状态</h6>
+                                            <div id="dbStatus">
+                                                <div class="spinner-border spinner-border-sm" role="status"></div>
+                                                <span class="ms-2">检查中...</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </main>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        // 全局变量
+        let adminToken = localStorage.getItem('adminToken');
+        const API_BASE = window.location.origin;
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            if (adminToken) {
+                showMainContent();
+                loadDashboard();
+            } else {
+                showLoginPage();
+            }
+        });
+
+        // 显示登录页面
+        function showLoginPage() {
+            document.getElementById('loginPage').style.display = 'flex';
+            document.getElementById('mainContent').style.display = 'none';
+        }
+
+        // 显示主内容
+        function showMainContent() {
+            document.getElementById('loginPage').style.display = 'none';
+            document.getElementById('mainContent').style.display = 'block';
+        }
+
+        // 登录
+        document.getElementById('loginForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const token = document.getElementById('adminToken').value;
+
+            // 简单验证token（实际应该调用API验证）
+            if (token) {
+                adminToken = token;
+                localStorage.setItem('adminToken', token);
+                showMainContent();
+                loadDashboard();
+                showAlert('登录成功', 'success');
+            } else {
+                showAlert('请输入有效的Token', 'danger');
+            }
+        });
+
+        // 退出登录
+        document.getElementById('logoutBtn').addEventListener('click', function(e) {
+            e.preventDefault();
+            localStorage.removeItem('adminToken');
+            adminToken = null;
+            showLoginPage();
+            showAlert('已退出登录', 'info');
+        });
+
+        // 页面切换
+        document.querySelectorAll('.nav-link[data-page]').forEach(link => {
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+
+                // 更新导航状态
+                document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+                this.classList.add('active');
+
+                // 显示对应页面
+                const page = this.dataset.page;
+                document.querySelectorAll('.page-content').forEach(content => {
+                    content.style.display = 'none';
+                });
+
+                const contentElement = document.getElementById(page + 'Content');
+                if (contentElement) {
+                    contentElement.style.display = 'block';
+                    document.getElementById('pageTitle').textContent = this.textContent.trim();
+
+                    // 加载页面数据
+                    loadPageData(page);
+                }
+            });
+        });
+
+        // 刷新按钮
+        document.getElementById('refreshBtn').addEventListener('click', function() {
+            const activePage = document.querySelector('.nav-link.active').dataset.page;
+            loadPageData(activePage);
+        });
+
+        // 加载页面数据
+        function loadPageData(page) {
+            switch(page) {
+                case 'dashboard':
+                    loadDashboard();
+                    break;
+                case 'users':
+                    loadUsers();
+                    break;
+                case 'analytics':
+                    loadAnalytics();
+                    break;
+                case 'logs':
+                    loadLogs();
+                    break;
+                case 'config':
+                    loadConfig();
+                    break;
+            }
+        }
+
+        // 加载仪表板数据
+        async function loadDashboard() {
+            try {
+                const response = await fetch(`${API_BASE}/api/admin/stats/system`, {
+                    headers: {
+                        'Authorization': `Bearer ${adminToken}`
+                    }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    document.getElementById('totalUsers').textContent = data.total_users || 0;
+                    document.getElementById('totalQueries').textContent = data.total_queries || 0; // 保持兼容性
+                    document.getElementById('dailyQueries').textContent = data.daily_queries || 0;
+                    document.getElementById('avgResponseTime').textContent = (data.avg_response_time || 0).toFixed(2) + 's';
+
+                    // 显示热门问题
+                    if (data.top_questions && data.top_questions.length > 0) {
+                        let html = '<table class="table table-bordered"><thead><tr><th>排名</th><th>问题</th><th>次数</th></tr></thead><tbody>';
+                        data.top_questions.forEach((q, index) => {
+                            html += `<tr><td>${index + 1}</td><td>${q.question}</td><td>${q.count}</td></tr>`;
+                        });
+                        html += '</tbody></table>';
+                        document.getElementById('popularQuestions').innerHTML = html;
+                    }
+                }
+            } catch (error) {
+                console.error('加载仪表板数据失败:', error);
+                showAlert('加载数据失败', 'danger');
+            }
+        }
+
+        // 加载用户数据
+        async function loadUsers() {
+            try {
+                const response = await fetch(`${API_BASE}/api/admin/users`, {
+                    headers: {
+                        'Authorization': `Bearer ${adminToken}`
+                    }
+                });
+
+                if (response.ok) {
+                    const users = await response.json();
+                    let html = '<table class="table table-bordered"><thead><tr><th>用户ID</th><th>查询次数</th><th>最后查询</th><th>平均响应时间</th></tr></thead><tbody>';
+
+                    users.forEach(user => {
+                        const lastQuery = user.last_query_time ? new Date(user.last_query_time).toLocaleString() : '-';
+                        const avgTime = user.avg_response_time ? user.avg_response_time.toFixed(2) + 's' : '-';
+                        html += `<tr><td>${user.user_id}</td><td>${user.total_queries}</td><td>${lastQuery}</td><td>${avgTime}</td></tr>`; // 保持兼容性
+                    });
+
+                    html += '</tbody></table>';
+                    document.getElementById('usersList').innerHTML = html;
+                }
+            } catch (error) {
+                console.error('加载用户数据失败:', error);
+                showAlert('加载用户数据失败', 'danger');
+            }
+        }
+
+        // 加载用户数据
+        async function loadUsers() {
+            try {
+                const response = await fetch(`${API_BASE}/api/admin/users`, {
+                    headers: {
+                        'Authorization': `Bearer ${adminToken}`
+                    }
+                });
+
+                if (response.ok) {
+                    const users = await response.json();
+                    let html = '<table class="table table-striped table-hover"><thead><tr><th>用户ID</th><th>查询次数</th><th>最后查询</th><th>平均响应时间</th><th>操作</th></tr></thead><tbody>';
+
+                    users.forEach(user => {
+                        const lastQuery = user.last_query_time ? new Date(user.last_query_time).toLocaleString() : '-';
+                        const avgTime = user.avg_response_time ? user.avg_response_time.toFixed(2) + 's' : '-';
+                        html += `<tr>
+                            <td><code>${user.user_id}</code></td>
+                            <td><span class="badge bg-primary">${user.total_queries}</span></td>
+                            <td>${lastQuery}</td>
+                            <td><span class="badge bg-info">${avgTime}</span></td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-primary" onclick="showUserDetail('${user.user_id}')">
+                                    <i class="bi bi-eye"></i> 详情
+                                </button>
+                            </td>
+                        </tr>`;
+                    });
+
+                    html += '</tbody></table>';
+                    document.getElementById('usersList').innerHTML = html;
+
+                    // 更新用户统计
+                    updateUserStats();
+                }
+            } catch (error) {
+                console.error('加载用户数据失败:', error);
+                showAlert('加载用户数据失败', 'danger');
+            }
+        }
+
+        // 搜索用户
+        async function searchUsers() {
+            const searchTerm = document.getElementById('userSearch').value.trim();
+            let url = `${API_BASE}/api/admin/users`;
+
+            if (searchTerm) {
+                url += `?search=${encodeURIComponent(searchTerm)}`;
+            }
+
+            try {
+                const response = await fetch(url, {
+                    headers: {
+                        'Authorization': `Bearer ${adminToken}`
+                    }
+                });
+
+                if (response.ok) {
+                    const users = await response.json();
+                    let html = '<table class="table table-striped table-hover"><thead><tr><th>用户ID</th><th>查询次数</th><th>最后查询</th><th>平均响应时间</th><th>操作</th></tr></thead><tbody>';
+
+                    if (users.length === 0) {
+                        html += '<tr><td colspan="5" class="text-center">没有找到匹配的用户</td></tr>';
+                    } else {
+                        users.forEach(user => {
+                            const lastQuery = user.last_query_time ? new Date(user.last_query_time).toLocaleString() : '-';
+                            const avgTime = user.avg_response_time ? user.avg_response_time.toFixed(2) + 's' : '-';
+                            html += `<tr>
+                                <td><code>${user.user_id}</code></td>
+                                <td><span class="badge bg-primary">${user.total_queries}</span></td>
+                                <td>${lastQuery}</td>
+                                <td><span class="badge bg-info">${avgTime}</span></td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-primary" onclick="showUserDetail('${user.user_id}')">
+                                        <i class="bi bi-eye"></i> 详情
+                                    </button>
+                                </td>
+                            </tr>`;
+                        });
+                    }
+
+                    html += '</tbody></table>';
+                    document.getElementById('usersList').innerHTML = html;
+                }
+            } catch (error) {
+                console.error('搜索用户失败:', error);
+                showAlert('搜索用户失败', 'danger');
+            }
+        }
+
+        // 显示用户详情
+        async function showUserDetail(userId) {
+            const modal = new bootstrap.Modal(document.getElementById('userDetailModal'));
+            document.getElementById('userDetailContent').innerHTML = `
+                <div class="text-center">
+                    <div class="spinner-border" role="status"></div>
+                    <p class="mt-2">加载用户详情中...</p>
+                </div>
+            `;
+            modal.show();
+
+            try {
+                const response = await fetch(`${API_BASE}/api/admin/users/${userId}/history`, {
+                    headers: {
+                        'Authorization': `Bearer ${adminToken}`
+                    }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    let html = `
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h5>用户ID: <code>${userId}</code></h5>
+                                <p>总查询数: <span class="badge bg-primary">${data.total}</span></p>
+                            </div>
+                        </div>
+                        <h6>查询历史:</h6>
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>时间</th>
+                                        <th>问题</th>
+                                        <th>响应</th>
+                                        <th>响应时间</th>
+                                        <th>状态</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                    `;
+
+                    if (data.history && data.history.length > 0) {
+                        data.history.forEach(item => {
+                            const statusBadge = item.status === 'success' ?
+                                '<span class="badge bg-success">成功</span>' :
+                                '<span class="badge bg-danger">失败</span>';
+
+                            html += `<tr>
+                                <td>${new Date(item.timestamp).toLocaleString()}</td>
+                                <td>${item.question}</td>
+                                <td><span title="${item.response}">${item.response}</span></td>
+                                <td>${item.response_time ? item.response_time.toFixed(2) + 's' : '-'}</td>
+                                <td>${statusBadge}</td>
+                            </tr>`;
+                        });
+                    } else {
+                        html += '<tr><td colspan="5" class="text-center">暂无查询记录</td></tr>';
+                    }
+
+                    html += '</tbody></table></div>';
+                    document.getElementById('userDetailContent').innerHTML = html;
+                }
+            } catch (error) {
+                console.error('加载用户详情失败:', error);
+                document.getElementById('userDetailContent').innerHTML = '<p class="text-danger">加载用户详情失败</p>';
+            }
+        }
+
+        // 更新用户统计
+        async function updateUserStats() {
+            try {
+                const response = await fetch(`${API_BASE}/api/admin/stats/system`, {
+                    headers: {
+                        'Authorization': `Bearer ${adminToken}`
+                    }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    document.getElementById('totalUsersCount').textContent = data.total_users || 0;
+                    document.getElementById('activeUsersCount').textContent = data.total_users || 0; // 简化处理
+                    document.getElementById('todayQueriesCount').textContent = data.daily_queries || 0;
+                    document.getElementById('avgResponseCount').textContent = (data.avg_response_time || 0).toFixed(1) + 's';
+                }
+            } catch (error) {
+                console.error('更新用户统计失败:', error);
+            }
+        }
+
+        // 加载数据分析
+        let activityChart = null;
+        async function loadAnalytics() {
+            const days = document.getElementById('analyticsDays').value;
+
+            try {
+                const response = await fetch(`${API_BASE}/api/admin/stats/activity?days=${days}`, {
+                    headers: {
+                        'Authorization': `Bearer ${adminToken}`
+                    }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+
+                    // 更新图表
+                    updateActivityChart(data.activities);
+
+                    // 更新表格
+                    updateActivityTable(data.activities);
+                }
+            } catch (error) {
+                console.error('加载数据分析失败:', error);
+                showAlert('加载数据分析失败', 'danger');
+            }
+        }
+
+        // 更新活动图表
+        function updateActivityChart(activities) {
+            const ctx = document.getElementById('activityChart').getContext('2d');
+
+            if (activityChart) {
+                activityChart.destroy();
+            }
+
+            activityChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: activities.map(a => a.date),
+                    datasets: [{
+                        label: '活跃用户',
+                        data: activities.map(a => a.active_users),
+                        borderColor: 'rgb(75, 192, 192)',
+                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                        yAxisID: 'y',
+                    }, {
+                        label: '查询次数',
+                        data: activities.map(a => a.total_queries),
+                        borderColor: 'rgb(255, 99, 132)',
+                        backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                        yAxisID: 'y1',
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false,
+                    },
+                    scales: {
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            grid: {
+                                drawOnChartArea: false,
+                            },
+                        },
+                    }
+                }
+            });
+        }
+
+        // 更新活动表格
+        function updateActivityTable(activities) {
+            let html = '<table class="table table-striped"><thead><tr><th>日期</th><th>活跃用户</th><th>查询次数</th><th>平均响应时间</th></tr></thead><tbody>';
+
+            activities.forEach(activity => {
+                html += `<tr>
+                    <td>${activity.date}</td>
+                    <td><span class="badge bg-primary">${activity.active_users}</span></td>
+                    <td><span class="badge bg-success">${activity.total_queries}</span></td> // 保持兼容性
+                    <td><span class="badge bg-info">${activity.avg_response_time.toFixed(2)}s</span></td>
+                </tr>`;
+            });
+
+            html += '</tbody></table>';
+            document.getElementById('activityTable').innerHTML = html;
+        }
+
+        // 加载操作日志
+        async function loadLogs() {
+            const level = document.getElementById('logLevel').value;
+            const page = document.getElementById('logPage').value;
+
+            let url = `${API_BASE}/api/admin/logs?page=${page}`;
+            if (level) {
+                url += `&level=${level}`;
+            }
+
+            try {
+                const response = await fetch(url, {
+                    headers: {
+                        'Authorization': `Bearer ${adminToken}`
+                    }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+
+                    // 更新日志列表
+                    updateLogsList(data.logs);
+
+                    // 更新分页
+                    updateLogPagination(page);
+                }
+            } catch (error) {
+                console.error('加载操作日志失败:', error);
+                showAlert('加载操作日志失败', 'danger');
+            }
+        }
+
+        // 更新日志列表
+        function updateLogsList(logs) {
+            let html = '<table class="table table-striped"><thead><tr><th>时间</th><th>级别</th><th>操作</th><th>用户</th><th>详情</th></tr></thead><tbody>';
+
+            logs.forEach(log => {
+                const levelBadge = getLogLevelBadge(log.level);
+                const time = new Date(log.timestamp).toLocaleString();
+
+                html += `<tr>
+                    <td>${time}</td>
+                    <td>${levelBadge}</td>
+                    <td>${log.operation}</td>
+                    <td>${log.user_id || '-'}</td>
+                    <td><small title="${log.details || '-'}">${(log.details || '-').substring(0, 50)}...</small></td>
+                </tr>`;
+            });
+
+            html += '</tbody></table>';
+            document.getElementById('logsList').innerHTML = html;
+        }
+
+        // 获取日志级别徽章
+        function getLogLevelBadge(level) {
+            switch(level) {
+                case 'info': return '<span class="badge bg-info">信息</span>';
+                case 'warning': return '<span class="badge bg-warning">警告</span>';
+                case 'error': return '<span class="badge bg-danger">错误</span>';
+                default: return `<span class="badge bg-secondary">${level}</span>`;
+            }
+        }
+
+        // 更新日志分页
+        function updateLogPagination(currentPage) {
+            document.getElementById('currentPage').textContent = currentPage;
+            document.getElementById('logPagination').style.display = 'block';
+        }
+
+        // 切换日志页面
+        function changeLogPage(direction) {
+            const currentPage = parseInt(document.getElementById('logPage').value);
+            const newPage = Math.max(1, currentPage + direction);
+            document.getElementById('logPage').value = newPage;
+            loadLogs();
+        }
+
+        // 加载系统配置
+        async function loadConfig() {
+            try {
+                const response = await fetch(`${API_BASE}/api/admin/config`, {
+                    headers: {
+                        'Authorization': `Bearer ${adminToken}`
+                    }
+                });
+
+                if (response.ok) {
+                    const config = await response.json();
+
+                    // 填充配置表单
+                    Object.keys(config).forEach(key => {
+                        const element = document.getElementById(key + 'Config');
+                        if (element) {
+                            if (element.type === 'checkbox') {
+                                element.checked = config[key].value === 'true';
+                            } else {
+                                element.value = config[key].value;
+                            }
+                        }
+                    });
+
+                    // 特殊处理
+                    if (config.callback_url) {
+                        document.getElementById('callbackUrl').value = config.callback_url.value;
+                    }
+
+                    // 检查系统状态
+                    checkSystemStatus();
+                }
+            } catch (error) {
+                console.error('加载系统配置失败:', error);
+                showAlert('加载系统配置失败', 'danger');
+            }
+        }
+
+        // 保存配置
+        document.getElementById('configForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            const configs = [
+                { key: 'admin_token', value: document.getElementById('adminTokenConfig').value },
+                { key: 'max_response_length', value: document.getElementById('maxResponseLength').value },
+                { key: 'response_timeout', value: document.getElementById('responseTimeout').value },
+                { key: 'api_timeout', value: document.getElementById('apiTimeout').value },
+                { key: 'enable_analytics', value: document.getElementById('enableAnalytics').checked.toString() },
+                { key: 'callback_url', value: document.getElementById('callbackUrl').value }
+            ];
+
+            try {
+                for (const config of configs) {
+                    if (config.value) {
+                        const response = await fetch(`${API_BASE}/api/admin/config`, {
+                            method: 'POST',
+                            headers: {
+                                'Authorization': `Bearer ${adminToken}`,
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify(config)
+                        });
+
+                        if (!response.ok) {
+                            throw new Error(`保存配置 ${config.key} 失败`);
+                        }
+                    }
+                }
+
+                showAlert('配置保存成功', 'success');
+
+                // 如果修改了token，需要重新登录
+                if (configs[0].value && configs[0].value !== adminToken) {
+                    localStorage.setItem('adminToken', configs[0].value);
+                    adminToken = configs[0].value;
+                    showAlert('管理员Token已更新，请记住新Token', 'warning');
+                }
+            } catch (error) {
+                console.error('保存配置失败:', error);
+                showAlert('保存配置失败', 'danger');
+            }
+        });
+
+        // 检查系统状态
+        async function checkSystemStatus() {
+            // 检查数据库状态
+            document.getElementById('dbStatus').innerHTML = '<span class="text-success"><i class="bi bi-check-circle"></i> 数据库连接正常</span>';
+        }
+
+        // 切换密码显示
+        function togglePassword(inputId) {
+            const input = document.getElementById(inputId);
+            const icon = event.target;
+
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.classList.remove('bi-eye');
+                icon.classList.add('bi-eye-slash');
+            } else {
+                input.type = 'password';
+                icon.classList.remove('bi-eye-slash');
+                icon.classList.add('bi-eye');
+            }
+        }
+
+        // 用户页面切换
+        function changeUserPage(direction) {
+            const currentPage = parseInt(document.getElementById('userPage').value);
+            const newPage = Math.max(1, currentPage + direction);
+            document.getElementById('userPage').value = newPage;
+            loadUsers();
+        }
+
+        // 显示提示消息
+        function showAlert(message, type) {
+            const alertHtml = `
+                <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            `;
+
+            // 在页面顶部显示提示
+            const mainContent = document.querySelector('.main-content');
+            mainContent.insertAdjacentHTML('afterbegin', alertHtml);
+
+            // 3秒后自动消失
+            setTimeout(() => {
+                const alert = mainContent.querySelector('.alert');
+                if (alert) {
+                    const bsAlert = new bootstrap.Alert(alert);
+                    bsAlert.close();
+                }
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
