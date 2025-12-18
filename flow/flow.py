@@ -1,16 +1,28 @@
-from typing import Annotated
+import asyncio
+from typing import Annotated, List
 import random
+import sqlite3
 
+from langchain_core.embeddings import Embeddings
+from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage, BaseMessage
+from langchain_core.retrievers import BaseRetriever
+from langchain_core.runnables import RunnableConfig
+from langchain_core.tools import Tool
+from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.checkpoint.memory import InMemorySaver
+from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from langgraph.config import get_stream_writer
 from langgraph.graph import add_messages
-from langgraph.prebuilt import create_react_agent, tools_condition
+from langgraph.checkpoint.sqlite import SqliteSaver
+from langgraph.store.base.batch import AsyncBatchedBaseStore
+from langgraph.store.sqlite import SqliteStore, AsyncSqliteStore
+# from langgraph.prebuilt import create_react_agent, tools_condition
 from langgraph.types import Command
 from typing_extensions import TypedDict
 
 from langgraph.graph import StateGraph, START, END
-from langgraph.prebuilt import ToolNode, tools_condition
+from langgraph.prebuilt import ToolNode, tools_condition, create_react_agent
 from embedding.embedding import AliEmbeddings
 from model.model import get_model_ali, get_langgraph_model
 from prompt.prompt import REACT_AGENT_PROMPT, CHECK_LAW_PROMPT
@@ -29,18 +41,16 @@ NODE_CHECK_LEGAL_QUESTION = "check_legal_question"
 NODE_LAW_AGENT = "law_agent"
 NODE_GET_NON_LEGAL_RESPONSE = "get_non_legal_response"
 
-def get_law_qa_flow(with_memory=False, use_multi_query_retriever=True):
+def get_law_qa_flow(model: BaseChatModel,
+                          embedding: Embeddings,
+                          retriever: BaseRetriever,
+                          tools: List[Tool],
+                          checkpoint_saver,
+                          store
+                          ):
     graph_builder = StateGraph(State)
 
-    llm = get_langgraph_model()
-    embedding = AliEmbeddings()
-    law_retriever = get_es_retriever("law_documents", embedding)
-    if use_multi_query_retriever:
-        law_retriever = get_multi_query_retriever(law_retriever, llm)
-
-    retriever_tool = get_law_documents_retriever_tool(law_retriever)
-
-    agent = create_react_agent(model=llm, tools=[retriever_tool])
+    agent = create_react_agent(model=model, tools=tools)
 
     def update_state(**kwargs) -> dict:
         state_update = {}
@@ -48,12 +58,12 @@ def get_law_qa_flow(with_memory=False, use_multi_query_retriever=True):
             state_update[key] = value
         return state_update
 
-    def call_arbitrary_model(state):
+    async def call_arbitrary_model(state):
         """Example node that calls an arbitrary model and streams the output"""
         writer = get_stream_writer()
         # Assume you have a streaming client that yields chunks
-        assistant_message = None
-        for chunk in agent.stream(state, stream_mode=["messages", "updates"]):
+        assistant_message = []
+        async for chunk in agent.astream(state, stream_mode=["updates", "messages"]):
             # print(chunk)
             # 提取llm最终的回复，通过return保存到state中
             if (chunk[0] == "updates" and
@@ -64,23 +74,24 @@ def get_law_qa_flow(with_memory=False, use_multi_query_retriever=True):
             writer({"llm_chunk": chunk})
         return {"messages": assistant_message}
 
-    def format_check_legal_prompt(state):
+    async def format_check_legal_prompt(state):
         prompt = CHECK_LAW_PROMPT.format_messages(question=state["messages"][-1].content)
         return Command(update=update_state(check_legal_question_prompt=prompt[0]))
 
-    def check_legal_question(state):
+    async def check_legal_question(state):
         messages = [state["check_legal_question_prompt"]]
-        messages = add_messages(messages, state["messages"])
-        res = llm.invoke(messages)
-        return Command(update=update_state(is_legal_question=(res.content == "Legal")))
+        messages = add_messages(state["messages"], messages)
+        core = model.ainvoke(messages)
+        res = await asyncio.gather(core)
+        return Command(update=update_state(is_legal_question=(res[0].content == "Legal")))
 
-    def agent_route(state):
+    async def agent_route(state):
         if state["is_legal_question"]:
             return NODE_LAW_AGENT
         else:
             return NODE_GET_NON_LEGAL_RESPONSE
 
-    def get_non_legal_response(state):
+    async def get_non_legal_response(state):
         """返回非法律问题的标准回复"""
         responses = [
             "抱歉，我是一个专门的法律智能助手，只能回答与法律相关的问题。请问您有什么法律方面的疑问吗？",
@@ -90,7 +101,7 @@ def get_law_qa_flow(with_memory=False, use_multi_query_retriever=True):
         ]
         writer = get_stream_writer()
         # Assume you have a streaming client that yields chunks
-        writer({"llm_chunk": ("messages", (AIMessage(content=random.choice(responses)),))})
+        writer({"llm_chunk": ("messages", (AIMessage(content=random.choice(responses)), {"langgraph_node": "agent"}))})
         return {"result": "completed"}
 
     graph_builder.add_node(NODE_FORMAT_CHECK_LEGAL_PROMPT, format_check_legal_prompt)
@@ -105,25 +116,25 @@ def get_law_qa_flow(with_memory=False, use_multi_query_retriever=True):
                                         {NODE_LAW_AGENT: NODE_LAW_AGENT, NODE_GET_NON_LEGAL_RESPONSE: NODE_GET_NON_LEGAL_RESPONSE})
     graph_builder.add_edge(NODE_LAW_AGENT, END)
     graph_builder.add_edge(NODE_GET_NON_LEGAL_RESPONSE, END)
-    graph = graph_builder.compile(checkpointer=InMemorySaver())
+    graph = graph_builder.compile(checkpointer=checkpoint_saver, store=store)
 
     return graph
 
-    for chunk in graph.stream(
-            {"messages": [{"role": "user",
-                           # "content": "我骑车正常行驶在正确的非机动车道上，在通过一个路口时慢行并左右观察确认无异常时通过了，但是此时从对面突然冲出来一个小孩，我无法立即刹车因此将他撞倒，我需要承担责任吗？"}]},
-                           "content": "今天天气如何？"}]},
-            stream_mode=["messages", "custom"],
-            subgraphs=True):
-        if chunk[1] == "messages":
-            continue
-        chunk = chunk[2]["llm_chunk"]
-        if chunk[0] != "messages":
-            continue
-        chunk = chunk[1][0]
-        if chunk.content == "":
-            continue
-        print(chunk.content, end="")
+    # for chunk in graph.stream(
+    #         {"messages": [{"role": "user",
+    #                        # "content": "我骑车正常行驶在正确的非机动车道上，在通过一个路口时慢行并左右观察确认无异常时通过了，但是此时从对面突然冲出来一个小孩，我无法立即刹车因此将他撞倒，我需要承担责任吗？"}]},
+    #                        "content": "今天天气如何？"}]},
+    #         stream_mode=["messages", "custom"],
+    #         subgraphs=True):
+    #     if chunk[1] == "messages":
+    #         continue
+    #     chunk = chunk[2]["llm_chunk"]
+    #     if chunk[0] != "messages":
+    #         continue
+    #     chunk = chunk[1][0]
+    #     if chunk.content == "":
+    #         continue
+    #     print(chunk.content, end="")
 
 
 def test():
@@ -167,5 +178,6 @@ def test():
 if __name__ == '__main__':
     # agent = get_qa_flow()
     # print(agent.invoke({"messages": [{"role": "user", "content": "我骑车正常行驶在正确的非机动车道上，在通过一个路口时慢行并左右观察确认无异常时通过了，但是此时从对面突然冲出来一个小孩，我无法立即刹车因此将他撞倒，我需要承担责任吗？"}]}))
-    test()
+    # test()
+    get_law_qa_flow()
     pass

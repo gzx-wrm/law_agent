@@ -680,7 +680,7 @@
                 if (response.ok) {
                     const data = await response.json();
                     document.getElementById('totalUsers').textContent = data.total_users || 0;
-                    document.getElementById('totalQueries').textContent = data.total_queries || 0; // 保持兼容性
+                    document.getElementById('totalQueries').textContent = data.total_queries || 0; 
                     document.getElementById('dailyQueries').textContent = data.daily_queries || 0;
                     document.getElementById('avgResponseTime').textContent = (data.avg_response_time || 0).toFixed(2) + 's';
 
@@ -716,7 +716,7 @@
                     users.forEach(user => {
                         const lastQuery = user.last_query_time ? new Date(user.last_query_time).toLocaleString() : '-';
                         const avgTime = user.avg_response_time ? user.avg_response_time.toFixed(2) + 's' : '-';
-                        html += `<tr><td>${user.user_id}</td><td>${user.total_queries}</td><td>${lastQuery}</td><td>${avgTime}</td></tr>`; // 保持兼容性
+                        html += `<tr><td>${user.user_id}</td><td>${user.total_queries}</td><td>${lastQuery}</td><td>${avgTime}</td></tr>`; 
                     });
 
                     html += '</tbody></table>';
@@ -994,7 +994,7 @@
                 html += `<tr>
                     <td>${activity.date}</td>
                     <td><span class="badge bg-primary">${activity.active_users}</span></td>
-                    <td><span class="badge bg-success">${activity.total_queries}</span></td> // 保持兼容性
+                    <td><span class="badge bg-success">${activity.total_queries}</span></td> 
                     <td><span class="badge bg-info">${activity.avg_response_time.toFixed(2)}s</span></td>
                 </tr>`;
             });

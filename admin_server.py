@@ -53,12 +53,13 @@ class ConfigUpdate(BaseModel):
 
 
 class AdminLog(BaseModel):
+    """管理员日志记录"""
     id: int
     timestamp: datetime
     level: str
     operation: str
-    user_id: str
-    details: str
+    user_id: Optional[str] = None
+    details: Optional[str] = None
 
 
 # 数据库操作函数
