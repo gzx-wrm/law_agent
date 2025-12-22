@@ -135,7 +135,7 @@ DEFAULT_CONFIGS = {
 
     # 从config.py合并的配置
     "api_timeout": 5,  # 对应config.API_TIMEOUT
-    "callback_url": "http://localhost:8080/send_custom_message",  # 对应config.CALLBACK_URL
+    "callback_url": "http://1.95.125.201/wx/send_custom_message",  # 对应config.CALLBACK_URL
     "web_host": "127.0.0.1",  # 对应config.WEB_HOST
     "web_port": 7860,  # 对应config.WEB_PORT
     "web_username": "username",  # 对应config.WEB_USERNAME

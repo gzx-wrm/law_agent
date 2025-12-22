@@ -1,10 +1,12 @@
 import asyncio
+import json
 import sys
 import time
 import uuid
 from contextlib import asynccontextmanager
 
 import aiosqlite
+import requests
 from aiosqlite import Connection
 from fastapi import FastAPI, Form, HTTPException
 from fastapi.responses import PlainTextResponse
@@ -163,11 +165,31 @@ async def send_callback_message(openid: str, content: str):
                 "content": content
             }
             callback_url = SystemConfig.get_callback_url()
+            print(f"callback_url: {callback_url}")
             response = await client.post(callback_url, data=data)
-            print(f"Callback response: {response.status_code}")
+            print(f"Callback response code: {response.status_code}, response content: {response.text}")
     except Exception as e:
         print(f"Failed to send callback message: {e}")
 
+def send_custom_message(openid: str, content: str):
+    """通过服务器接口发送客服消息"""
+    url = SystemConfig.get_callback_url()
+    data = {
+        "openid": openid,
+        "message_type": "text",
+        "content": content
+    }
+    try:
+        resp = requests.post(
+            url,
+            data=json.dumps(data, ensure_ascii=False).encode('utf-8'),
+            headers={"Content-Type": "application/json"},
+            timeout=10
+        )
+        return resp.json()
+    except Exception as e:
+        print(f"发送客服消息失败: {e}")
+        return {"errcode": -1, "errmsg": str(e)}
 
 async def is_request_already_processed(request_id: str) -> bool:
     """检查request_id是否已经被处理过"""
@@ -248,7 +270,13 @@ async def log_query_data(user_id: str, question: str, response: str, response_ti
         return False
 
 
-async def get_ai_response_with_timeout(message: str, user_id: str, timeout: int = None, request_id: str = None) -> str:
+async def get_ai_response_with_timeout(
+    message: str,
+    user_id: str,
+    timeout: int = None,
+    request_id: str = None,
+    spawn_background_on_timeout: bool = True,
+) -> str:
     """获取AI响应，带超时控制"""
     global graph
 
@@ -288,7 +316,10 @@ async def get_ai_response_with_timeout(message: str, user_id: str, timeout: int 
                     continue
                 full_response += ai_message.content
 
-        await asyncio.wait_for(collect_response(), timeout=timeout)
+        if timeout and timeout > 0:
+            await asyncio.wait_for(collect_response(), timeout=timeout)
+        else:
+            await collect_response()
 
         # 记录成功的查询数据
         response_time = time.time() - start_time
@@ -301,20 +332,16 @@ async def get_ai_response_with_timeout(message: str, user_id: str, timeout: int 
         return full_response
 
     except asyncio.TimeoutError:
-        # 记录超时的查询数据
-        response_time = time.time() - start_time
-        log_success = await log_query_data(user_id, message, "", response_time, "timeout", request_id)
-
         # 将请求信息存储到pending_requests中，用于后续回调
-        if log_success:
-            pending_requests[request_id] = {
-                "user_id": user_id,
-                "message": message,
-                "start_time": start_time
-            }
+        pending_requests[request_id] = {
+            "user_id": user_id,
+            "message": message,
+            "start_time": start_time
+        }
 
         # 超时后继续在后台获取完整结果并发送回调
-        asyncio.create_task(get_and_send_callback(message, user_id, request_id))
+        if spawn_background_on_timeout:
+            asyncio.create_task(get_and_send_callback(message, user_id, request_id))
         return "问题较复杂，正在为您查询相关法律条文，请稍后回复完整答案..."
     except Exception as e:
         # 记录失败的查询数据
@@ -336,11 +363,19 @@ async def get_and_send_callback(message: str, user_id: str, request_id: str = No
                 del pending_requests[request_id]
             return
 
-        response = await get_ai_response_with_timeout(message, user_id, timeout=60, request_id=request_id)
+        response = await get_ai_response_with_timeout(
+            message,
+            user_id,
+            timeout=0,
+            request_id=request_id,
+            spawn_background_on_timeout=False,
+        )
         # 限制回调消息长度为2048字符
-        if len(response) > 2048:
-            response = response[:2045] + "..."
-        await send_callback_message(user_id, response)
+        if len(response) > 500:
+            response = response[:500] + "..."
+        # await send_callback_message(user_id, response)
+        resp = send_custom_message(user_id, response)
+        print(f"callback resp: {resp}")
 
         # 从pending_requests中移除已完成的请求
         if request_id and request_id in pending_requests:
@@ -348,6 +383,10 @@ async def get_and_send_callback(message: str, user_id: str, request_id: str = No
 
     except Exception as e:
         print(f"Background processing failed: {e}")
+        try:
+            await send_callback_message(user_id, "抱歉，系统暂时无法处理您的请求，请稍后再试")
+        except Exception as callback_error:
+            print(f"Failed to send error callback message: {callback_error}")
         # 即使失败也要清理pending_requests
         if request_id and request_id in pending_requests:
             del pending_requests[request_id]
@@ -391,19 +430,18 @@ async def api_chat(
     if not content.strip():
         return "请输入您的法律问题"
 
+    print(f"received request: {json.dumps({'from_user': from_user, 'content': content, type: type})}")
     try:
-        # 生成唯一请求ID
         request_id = generate_request_id()
 
-        # 获取AI响应（带超时和request_id）
-        response = await get_ai_response_with_timeout(content, from_user, request_id=request_id)
+        pending_requests[request_id] = {
+            "user_id": from_user,
+            "message": content,
+            "start_time": time.time()
+        }
 
-        # 使用动态配置限制响应长度
-        max_length = SystemConfig.get_max_response_length()
-        if len(response) > max_length:
-            response = response[:max_length-3] + "..."
-
-        return response
+        asyncio.create_task(get_and_send_callback(content, from_user, request_id=request_id))
+        return "已收到您的问题，我正在为您查询相关法律条文并整理答复，请稍等片刻。"
 
     except Exception as e:
         print(f"API chat error: {e}")
